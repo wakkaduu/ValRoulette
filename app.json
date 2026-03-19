@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "ValRoulette",
+    "slug": "ValRoulette",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F1923"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0F1923"
+      },
+      "package": "com.valroulette.wakkadu"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c3b48411-c22f-48b4-908e-d37d00533818"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
