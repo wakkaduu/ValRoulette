@@ -191,7 +191,7 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <Animated.View style={[styles.loadingScreen, { opacity: loaderFade }]}>
-        <Image source={require('../assets/images/icon.jpg')} style={styles.loadingLogo} />
+        <Image source={require('../assets/images/icon.png')} style={styles.loadingLogo} />
         <Text style={[styles.introAppName, { color: themeColor }]}>VALORANT ROULETTE</Text>
         <Text style={styles.introDevName}>DEVELOPED BY WAKKADUU</Text>
         <View style={{ marginTop: 40, alignItems: 'center' }}>
