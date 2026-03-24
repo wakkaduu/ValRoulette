@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const [playerNames, setPlayerNames] = useState(['', '', '', '', '']);
   const [savedSquads, setSavedSquads] = useState<any[]>([]);
   const [isBalanced, setIsBalanced] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); 
   const [appIsReady, setAppIsReady] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
@@ -50,6 +50,7 @@ export default function HomeScreen() {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const bootRadar = useRef(new Animated.Value(0)).current;
   const podAnims = useRef(playerNames.map(() => new Animated.Value(0))).current;
+  const loaderFade = useRef(new Animated.Value(1)).current;
 
   // Keyboard Visibility Logic
   useEffect(() => {
@@ -92,19 +93,31 @@ export default function HomeScreen() {
         const savedTheme = await AsyncStorage.getItem('@app_theme');
         if (savedTheme) setThemeColor(savedTheme);
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (e) { console.error(e); } finally { setAppIsReady(true); }
+        // Extended delay for your custom Intro/Branding Screen
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } catch (e) { 
+        console.error(e); 
+      } finally { 
+        setAppIsReady(true); 
+      }
     };
     init();
     Animated.loop(Animated.timing(rotateAnim, { toValue: 1, duration: 60000, useNativeDriver: true })).start();
   }, []);
 
+  // Smooth Transition to App
   useEffect(() => {
     if (appIsReady) {
-      SplashScreen.hideAsync();
-      setLoading(false);
-      if (useAnimations) startBootSequence();
-      else skipBoot();
+      Animated.timing(loaderFade, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }).start(() => {
+        setLoading(false);
+        SplashScreen.hideAsync();
+        if (useAnimations) startBootSequence();
+        else skipBoot();
+      });
     }
   }, [appIsReady]);
 
@@ -173,7 +186,28 @@ export default function HomeScreen() {
     });
   };
 
-  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color={themeColor} /></View>;
+  // --- CUSTOM TACTICAL INTRO SCREEN ---
+  if (loading) {
+    return (
+      <Animated.View style={[styles.loadingScreen, { opacity: loaderFade }]}>
+        <Image 
+          source={require('../assets/images/icon.png')} 
+          style={styles.loadingLogo} 
+        />
+        <Text style={[styles.introAppName, { color: themeColor }]}>VALORANT ROULETTE</Text>
+        <Text style={styles.introDevName}>DEVELOPED BY WAKKADUU</Text>
+
+        <View style={{ marginTop: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={themeColor} />
+          <Text style={[styles.loadingText, { color: '#8B97A5' }]}>INITIALIZING AGENT PROTOCOL...</Text>
+        </View>
+
+        <View style={styles.loadingBarContainer}>
+           <Animated.View style={[styles.loadingBar, { backgroundColor: themeColor, width: '85%' }]} />
+        </View>
+      </Animated.View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F1923' }}>
@@ -288,6 +322,56 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F1923', alignItems: 'center', justifyContent: 'center' },
   centered: { flex: 1, backgroundColor: '#0F1923', justifyContent: 'center', alignItems: 'center' },
+  
+  // INTRO SCREEN STYLES
+  loadingScreen: { 
+    flex: 1, 
+    backgroundColor: '#0F1923', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 100 
+  },
+  loadingLogo: { 
+    width: 100, 
+    height: 100, 
+    marginBottom: 20, 
+    resizeMode: 'contain' 
+  },
+  introAppName: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 4,
+    marginBottom: 5,
+    textAlign: 'center'
+  },
+  introDevName: {
+    color: '#8B97A5',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  loadingText: { 
+    fontSize: 8, 
+    fontWeight: 'bold', 
+    letterSpacing: 2, 
+    marginTop: 10 
+  },
+  loadingBarContainer: { 
+    width: '50%', 
+    height: 2, 
+    backgroundColor: '#161d24', 
+    marginTop: 30, 
+    overflow: 'hidden' 
+  },
+  loadingBar: { 
+    height: '100%' 
+  },
+
   radarRing: { position: 'absolute', width: width * 0.9, height: width * 0.9, borderRadius: width, borderWidth: 1, borderStyle: 'dashed' },
   headerArea: { position: 'absolute', top: 60, width: '100%', paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 },
   title: { color: '#ECE8E1', fontWeight: '900', letterSpacing: 2, fontSize: 16 },
@@ -328,7 +412,7 @@ const styles = StyleSheet.create({
   fullPresetItem: { backgroundColor: '#161d24', padding: 20, borderRadius: 4, marginBottom: 12, borderLeftWidth: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   presetLabelMain: { color: '#ECE8E1', fontSize: 18, fontWeight: 'bold' },
   presetNamesSub: { color: '#8B97A5', fontSize: 11, marginTop: 4 },
-  footerArea: { position: 'absolute', bottom: 85, width: '75%', gap: 12 },
+  footerArea: { position: 'absolute', bottom: 85, width: '75%', alignSelf: 'center', gap: 12 },
   balancedBtn: { backgroundColor: '#161d24', padding: 12, borderRadius: 2, borderWidth: 1, borderColor: '#333', alignItems: 'center' },
   balancedBtnText: { color: '#ECE8E1', fontWeight: 'bold', fontSize: 11 },
   saveContainer: { flexDirection: 'row', gap: 10 },
