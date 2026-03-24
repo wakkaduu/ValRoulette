@@ -44,6 +44,10 @@ export default function HomeScreen() {
   const [squadLabel, setSquadLabel] = useState("");
   const [themeColor, setThemeColor] = useState('#FF4655');
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [currentRoleLayout, setCurrentRoleLayout] = useState<string[]>([]);
+  
+  // NEW: State for the transient info popup
+  const [showModeInfo, setShowModeInfo] = useState(false);
 
   const lastBackPressed = useRef(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -52,14 +56,12 @@ export default function HomeScreen() {
   const podAnims = useRef(playerNames.map(() => new Animated.Value(0))).current;
   const loaderFade = useRef(new Animated.Value(1)).current;
 
-  // Keyboard Visibility Logic
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  // Back Button Hardware Handling
   useEffect(() => {
     const backAction = () => {
       if (!showSettings && !showPresets) {
@@ -78,7 +80,6 @@ export default function HomeScreen() {
     return () => backHandler.remove();
   }, [showSettings, showPresets]);
 
-  // Initialization & API Fetch
   useEffect(() => {
     const init = async () => {
       try {
@@ -93,26 +94,16 @@ export default function HomeScreen() {
         const savedTheme = await AsyncStorage.getItem('@app_theme');
         if (savedTheme) setThemeColor(savedTheme);
 
-        // Extended delay for your custom Intro/Branding Screen
         await new Promise(resolve => setTimeout(resolve, 3000));
-      } catch (e) { 
-        console.error(e); 
-      } finally { 
-        setAppIsReady(true); 
-      }
+      } catch (e) { console.error(e); } finally { setAppIsReady(true); }
     };
     init();
     Animated.loop(Animated.timing(rotateAnim, { toValue: 1, duration: 60000, useNativeDriver: true })).start();
   }, []);
 
-  // Smooth Transition to App
   useEffect(() => {
     if (appIsReady) {
-      Animated.timing(loaderFade, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }).start(() => {
+      Animated.timing(loaderFade, { toValue: 0, duration: 800, useNativeDriver: true }).start(() => {
         setLoading(false);
         SplashScreen.hideAsync();
         if (useAnimations) startBootSequence();
@@ -130,8 +121,21 @@ export default function HomeScreen() {
 
   const skipBoot = () => { bootRadar.setValue(1); podAnims.forEach(anim => anim.setValue(1)); };
 
+  const toggleModeInfo = () => {
+    setShowModeInfo(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeout(() => {
+      setShowModeInfo(false);
+    }, 5000);
+  };
+
   const generateSquad = () => {
     if (isSpinning || allAgents.length === 0) return;
+    
+    const tacticalComposition = ['Controller', 'Sentinel', 'Duelist', 'Initiator', 'Duelist'];
+    const randomizedRoles = [...tacticalComposition].sort(() => Math.random() - 0.5);
+    setCurrentRoleLayout(randomizedRoles);
+
     setIsSpinning(true);
     setSquad([null, null, null, null, null]);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -152,7 +156,6 @@ export default function HomeScreen() {
     ]).start();
     const interval = setInterval(() => {
       const flickerAgent = allAgents[Math.floor(Math.random() * allAgents.length)];
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSquad(prev => {
         const next = [...prev];
         next[index] = { ign: playerNames[index] || `P${index + 1}`, agent: flickerAgent };
@@ -161,7 +164,6 @@ export default function HomeScreen() {
       iterations++;
       if (iterations >= maxFlashes) {
         clearInterval(interval);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         lockInPlayer(index);
         setTimeout(() => animatePlayerStep(index + 1), 150);
       }
@@ -169,16 +171,16 @@ export default function HomeScreen() {
   };
 
   const lockInPlayer = (index: number) => {
-    let pool = [...allAgents];
+    let pool = [...allAgents].sort(() => Math.random() - 0.5);
     setSquad(prev => {
       const currentLockedUuids = prev.filter((s, idx) => s && idx < index).map(s => s.agent.uuid);
       const filteredPool = pool.filter(a => !currentLockedUuids.includes(a.uuid));
       let finalAgent;
       if (isBalanced) {
-        const rolesNeeded = ['Controller', 'Sentinel', 'Duelist', 'Initiator', 'Duelist'];
-        finalAgent = filteredPool.find(a => a.role?.displayName === rolesNeeded[index]) || filteredPool[0];
+        const targetRole = currentRoleLayout[index] || 'Duelist';
+        finalAgent = filteredPool.find(a => a.role?.displayName === targetRole) || filteredPool[0];
       } else {
-        finalAgent = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+        finalAgent = filteredPool[0]; 
       }
       const next = [...prev];
       next[index] = { ign: playerNames[index] || `P${index + 1}`, agent: finalAgent };
@@ -186,22 +188,16 @@ export default function HomeScreen() {
     });
   };
 
-  // --- CUSTOM TACTICAL INTRO SCREEN ---
   if (loading) {
     return (
       <Animated.View style={[styles.loadingScreen, { opacity: loaderFade }]}>
-        <Image 
-          source={require('../assets/images/icon.png')} 
-          style={styles.loadingLogo} 
-        />
+        <Image source={require('../assets/images/icon.jpg')} style={styles.loadingLogo} />
         <Text style={[styles.introAppName, { color: themeColor }]}>VALORANT ROULETTE</Text>
         <Text style={styles.introDevName}>DEVELOPED BY WAKKADUU</Text>
-
         <View style={{ marginTop: 40, alignItems: 'center' }}>
           <ActivityIndicator size="small" color={themeColor} />
           <Text style={[styles.loadingText, { color: '#8B97A5' }]}>INITIALIZING AGENT PROTOCOL...</Text>
         </View>
-
         <View style={styles.loadingBarContainer}>
            <Animated.View style={[styles.loadingBar, { backgroundColor: themeColor, width: '85%' }]} />
         </View>
@@ -214,19 +210,16 @@ export default function HomeScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
           <Animated.View style={[styles.radarRing, { borderColor: themeColor + '22', transform: [{ scale: bootRadar }, { rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]} />
-
           <View style={styles.headerArea}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => setShowSettings(true)}><Text style={styles.iconBtnText}>⚙️</Text></TouchableOpacity>
             <Text style={styles.title}>VALORANT ROULETTE</Text>
             <TouchableOpacity style={styles.iconBtn} onPress={() => setShowPresets(true)}><Text style={styles.iconBtnText}>📂</Text></TouchableOpacity>
           </View>
-
           <View style={styles.centerStage}>
             <TouchableOpacity style={styles.coreTouch} onPress={generateSquad} activeOpacity={0.8} disabled={isSpinning}>
               <Animated.View style={[styles.coreGlow, { backgroundColor: themeColor + '22', transform: [{ scale: pulseAnim }] }]} />
               <View style={[styles.coreButton, { backgroundColor: isSpinning ? '#1F2933' : themeColor }]}><Text style={styles.coreText}>{isSpinning ? "---" : "ROLL"}</Text></View>
             </TouchableOpacity>
-
             {playerNames.map((name, i) => {
               const pos = getPosition(i, width * 0.35);
               const res = squad[i];
@@ -242,12 +235,39 @@ export default function HomeScreen() {
               );
             })}
           </View>
-
           {!isKeyboardVisible && (
             <View style={styles.footerArea}>
-              <TouchableOpacity style={[styles.balancedBtn, isBalanced && {borderColor: themeColor, backgroundColor: themeColor + '11'}]} onPress={() => setIsBalanced(!isBalanced)}>
-                <Text style={[styles.balancedBtnText, isBalanced && {color: themeColor}]}>{isBalanced ? "🛡️ MODE: BALANCED ROLE" : "🎲 MODE: FULL RANDOM"}</Text>
-              </TouchableOpacity>
+              {showModeInfo && (
+                <View style={styles.floatingInfoBox}>
+                  <Text style={[styles.infoTitle, { color: themeColor }]}>
+                    {isBalanced ? "🛡️ BALANCED PROTOCOL" : "🎲 FULL RANDOM"}
+                  </Text>
+                  <Text style={styles.infoText}>
+                    {isBalanced 
+                      ? "Ensures 1 Smoker, 1 Sentinel, 1 Initiator, & 2 Duelists in random slots." 
+                      : "No restrictions. Any agent can occupy any slot. Maximum variance."}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <TouchableOpacity 
+                  style={[
+                    styles.balancedBtn, 
+                    { flex: 1 },
+                    isBalanced && {borderColor: themeColor, backgroundColor: themeColor + '11'},
+                    isSpinning && { opacity: 0.4 }
+                  ]} 
+                  onPress={() => !isSpinning && setIsBalanced(!isBalanced)}
+                  activeOpacity={isSpinning ? 1 : 0.7}
+                >
+                  <Text style={[styles.balancedBtnText, isBalanced && {color: themeColor}]}>
+                    {isBalanced ? "🛡️ BALANCED ROLE" : "🎲 FULL RANDOM"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.infoCircle} onPress={toggleModeInfo}>
+                  <Text style={{ color: '#8B97A5', fontWeight: 'bold', fontSize: 12 }}>i</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.saveContainer}>
                   <TextInput style={styles.saveInput} placeholder="TEAM NAME" placeholderTextColor="#3e4a56" value={squadLabel} onChangeText={setSquadLabel} />
                   <TouchableOpacity style={[styles.saveBtn, {backgroundColor: themeColor}]} onPress={async () => {
@@ -266,7 +286,6 @@ export default function HomeScreen() {
           )}
         </View>
       </TouchableWithoutFeedback>
-
       <Modal visible={showSettings} animationType="slide" transparent={true} onRequestClose={() => {setShowSettings(false); setExpandAbout(false);}}>
         <View style={styles.overlay}>
           <View style={styles.modalHeader}>
@@ -298,7 +317,6 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
       </Modal>
-
       <Modal visible={showPresets} animationType="fade" transparent={true} onRequestClose={() => setShowPresets(false)}>
         <View style={styles.overlay}>
           <View style={styles.modalHeader}>
@@ -321,57 +339,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F1923', alignItems: 'center', justifyContent: 'center' },
-  centered: { flex: 1, backgroundColor: '#0F1923', justifyContent: 'center', alignItems: 'center' },
-  
-  // INTRO SCREEN STYLES
-  loadingScreen: { 
-    flex: 1, 
-    backgroundColor: '#0F1923', 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 100 
-  },
-  loadingLogo: { 
-    width: 100, 
-    height: 100, 
-    marginBottom: 20, 
-    resizeMode: 'contain' 
-  },
-  introAppName: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 4,
-    marginBottom: 5,
-    textAlign: 'center'
-  },
-  introDevName: {
-    color: '#8B97A5',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    marginBottom: 20,
-    textAlign: 'center'
-  },
-  loadingText: { 
-    fontSize: 8, 
-    fontWeight: 'bold', 
-    letterSpacing: 2, 
-    marginTop: 10 
-  },
-  loadingBarContainer: { 
-    width: '50%', 
-    height: 2, 
-    backgroundColor: '#161d24', 
-    marginTop: 30, 
-    overflow: 'hidden' 
-  },
-  loadingBar: { 
-    height: '100%' 
-  },
-
+  loadingScreen: { flex: 1, backgroundColor: '#0F1923', justifyContent: 'center', alignItems: 'center', position: 'absolute', width: '100%', height: '100%', zIndex: 100 },
+  loadingLogo: { width: 100, height: 100, marginBottom: 20, resizeMode: 'contain' },
+  introAppName: { fontSize: 24, fontWeight: '900', letterSpacing: 4, marginBottom: 5, textAlign: 'center' },
+  introDevName: { color: '#8B97A5', fontSize: 10, fontWeight: 'bold', letterSpacing: 2, marginBottom: 20, textAlign: 'center' },
+  loadingText: { fontSize: 8, fontWeight: 'bold', letterSpacing: 2, marginTop: 10 },
+  loadingBarContainer: { width: '50%', height: 2, backgroundColor: '#161d24', marginTop: 30, overflow: 'hidden' },
+  loadingBar: { height: '100%' },
   radarRing: { position: 'absolute', width: width * 0.9, height: width * 0.9, borderRadius: width, borderWidth: 1, borderStyle: 'dashed' },
   headerArea: { position: 'absolute', top: 60, width: '100%', paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 },
   title: { color: '#ECE8E1', fontWeight: '900', letterSpacing: 2, fontSize: 16 },
@@ -418,5 +392,10 @@ const styles = StyleSheet.create({
   saveContainer: { flexDirection: 'row', gap: 10 },
   saveInput: { flex: 1, backgroundColor: '#161d24', color: '#ECE8E1', padding: 12, fontSize: 12, borderBottomWidth: 1, borderColor: '#333' },
   saveBtn: { paddingHorizontal: 25, justifyContent: 'center', borderRadius: 2 },
-  saveBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 }
+  saveBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
+  // NEW STYLES
+  infoCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#3e4a56', justifyContent: 'center', alignItems: 'center', backgroundColor: '#161d24' },
+  floatingInfoBox: { position: 'absolute', bottom: 110, backgroundColor: '#161d24', padding: 15, borderRadius: 4, borderWidth: 1, borderColor: '#333', width: '100%', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, zIndex: 999 },
+  infoTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 2, marginBottom: 5 },
+  infoText: { color: '#8B97A5', fontSize: 11, lineHeight: 16 }
 });
